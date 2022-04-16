@@ -7,15 +7,16 @@ import (
 	"encoding/base32"
 	"encoding/json"
 	"fmt"
-	"github.com/OpenPrinting/goipp"
-	"github.com/jung-kurt/gofpdf"
-	pdfcpu "github.com/pdfcpu/pdfcpu/pkg/api"
 	"io"
 	"net/http"
 	"os"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/OpenPrinting/goipp"
+	"github.com/jung-kurt/gofpdf"
+	pdfcpu "github.com/pdfcpu/pdfcpu/pkg/api"
 )
 
 type (
@@ -63,50 +64,24 @@ func cupsHandler(to []byte) func(writer http.ResponseWriter, request *http.Reque
 					panic(err)
 				}
 
-				hash := sha1.New()
-				hash.Write([]byte(request.URL.Path))
-				pdfLocation := fmt.Sprintf("%v/%s.pdf", cacheFolder, base32.StdEncoding.EncodeToString(hash.Sum(nil)))
+				inRead := bytes.NewReader(bts[sep:])
+				fp, err := os.OpenFile("./out.pdf", os.O_RDWR|os.O_CREATE, 0755)
 
-				stat, stErr := os.Stat(pdfLocation)
-				var skipBuild = stErr == nil && stat != nil && time.Now().Before(stat.ModTime().Add(timeoutPdf))
-
-				// Test if the page exists and is recent enough
-				var oldPage readSeekWriter
-				oldPage, err = os.OpenFile(pdfLocation, os.O_RDWR|os.O_CREATE, 0755)
 				if err != nil {
-					skipBuild = false
-				}
-
-				// If the cached page is not there, create a buffer which can be used to store the file in
-				if oldPage == nil {
-					oldPage, err = memFs.OpenFile(pdfLocation, os.O_RDWR|os.O_CREATE, 0755)
-					if err != nil {
-						// TODO log
-						panic(err)
-					}
-
-					defer memFs.Remove(pdfLocation)
-				} else {
-					oldPage.Seek(0, 0)
-				}
-
-				pdfParts := []io.ReadSeeker{oldPage, bytes.NewReader(bts[sep:])}
-				defer oldPage.Close()
-				if !skipBuild {
-					order, mp := requestToMap(request)
-					if err := renderPage(oldPage, order, mp); err != nil {
-						// TODO log
-						pdfParts = pdfParts[1:]
-					} else if _, err := oldPage.Seek(0, 0); err != nil {
-						// TODO log
-						pdfParts = pdfParts[1:]
-					}
-				}
-
-				if err := pdfcpu.Merge(pdfParts, rw, nil); err != nil {
 					panic(err)
 				}
 
+				if pdfAnnotationMode == "banner" {
+					err = addBannerPage(inRead, fp, request)
+				} else {
+					err = fmt.Errorf("unknown annotation mode: %v", pdfAnnotationMode)
+				}
+
+				if err != nil {
+					panic(err)
+				}
+
+				fp.Close()
 				_ = rw.Close()
 			}()
 		}
@@ -139,6 +114,54 @@ func cupsHandler(to []byte) func(writer http.ResponseWriter, request *http.Reque
 			panic(err)
 		}
 	}
+}
+
+func addBannerPage(inRead io.ReadSeeker, outWrite io.Writer, request *http.Request) error {
+	hash := sha1.New()
+	hash.Write([]byte(request.URL.Path))
+	pdfLocation := fmt.Sprintf("%v/%s.pdf", cacheFolder, base32.StdEncoding.EncodeToString(hash.Sum(nil)))
+
+	stat, stErr := os.Stat(pdfLocation)
+	var skipBuild = stErr == nil && stat != nil && time.Now().Before(stat.ModTime().Add(timeoutPdf))
+
+	// Test if the page exists and is recent enough
+	var bannerPage readSeekWriter
+	var err error
+	bannerPage, err = os.OpenFile(pdfLocation, os.O_RDWR|os.O_CREATE, 0755)
+	if err != nil {
+		skipBuild = false
+	}
+
+	// If the cached page is not there, create a buffer which can be used to store the file in
+	if bannerPage == nil {
+		bannerPage, err = memFs.OpenFile(pdfLocation, os.O_RDWR|os.O_CREATE, 0755)
+		if err != nil {
+			// TODO log
+			panic(err)
+		}
+
+		defer memFs.Remove(pdfLocation)
+	} else {
+		bannerPage.Seek(0, 0)
+	}
+
+	pdfParts := []io.ReadSeeker{bannerPage, inRead}
+	defer bannerPage.Close()
+	if !skipBuild {
+		order, mp := requestToMap(request)
+		if err := renderPage(bannerPage, order, mp); err != nil {
+			// TODO log
+			pdfParts = pdfParts[1:]
+		} else if _, err := bannerPage.Seek(0, 0); err != nil {
+			// TODO log
+			pdfParts = pdfParts[1:]
+		}
+	}
+	if err := pdfcpu.Merge(pdfParts, outWrite, nil); err != nil {
+		panic(err)
+	}
+
+	return err
 }
 
 // renderPage renders a single pdf, which will be prefixed to the actual page, i.e. a banner page

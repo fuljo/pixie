@@ -57,18 +57,24 @@ All config is done through environment variables. The following variables are av
 | `WEBHOOK_METHOD`       | `String`   | "GET"         | The HTTP-verb to use for the webhook.                                                                                                                                              |
 | `WEBHOOK_TIMEOUT`      | `Duration` | "250ms"       | The webhook timeout before continuing without the webhook results.                                                                                                                 |
 | `WEBHOOK_MERGE`        | `Boolean`  | false         | Whether to merge the webhook results with the key-value pairs in the url                                                                                                           |
+| `IPP_CACHE_DIR`        | `String`   | "/tmp/pixie/" | Location of the rendered PDF pages.                                                                                                                                                |
+| `LISTEN_ADDR`          | `String`   | ":6632"       | The ip and port pair pixie will listen on.                                                                                                                                         |
+| `PDF_ANNOTATION_MODE`          | `String`   | "banner"       | How to annotate the document. `banner`: add banner page.                                                                                                                                         |
+
+### Banner page
+| Variable               | Type       | Default       | Description                                                                                                                                                                        |
+|------------------------|------------|---------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `PDF_UNIT_SIZE`        | `String`   | "mm"          | The unit size used on the PDF, either "mm", "cm" or for freedom-units: "in". Empty value implies "mm".                                                                             |
 | `PDF_PAGE_SIZE`        | `String`   | "A4"          | Page size of PDFs to be printed. Does not need to match, but for best results should. Allowed values: "A3", "A4", "A5", "Letter", "Legal", or "Tabloid". Empty value implies "A4". |
 | `PDF_FONT_DIR`         | `String`   | ""            | File-path for 'special' fonts. Only normal fonts are currently supported. So can be left empty. Empty value implies "./"                                                           |
 | `PDF_LANDSCAPE`        | `Boolean`  | false         | Whether the prepended page should be rendered in landscape. If left default, or set to false, the page is rendered in portrait.                                                    |
 | `PDF_REFRESH_DURATION` | `Duration` | "5m"          | How long the rendered PDF page will be cached before a rerender is forced. Caching is done based on the key-value pairs set in the printer url                                     |
-| `IPP_CACHE_DIR`        | `String`   | "/tmp/pixie/" | Location of the rendered PDF pages.                                                                                                                                                |
 | `IMAGE_PPI`            | `Integer`  | 120           | What PPI should be used for printing the image.                                                                                                                                    |
 | `PDF_LEFT_MARGIN`      | `Integer`  | 10            | The left-margin for the prepended page.                                                                                                                                            |
 | `PDF_TOP_MARGIN`       | `Integer`  | 15            | The top-margin for the prepended page.                                                                                                                                             |
 | `PDF_BOTTOM_MARGIN`    | `Integer`  | 6             | The bottom-margin for the prepended page. Note, if too much content is added on the page, only the first page is added.                                                            |
 | `PDF_LINE_HEIGHT`      | `Integer`  | 8             | The line height of the printed key-value pairs. Since font-size currently cannot be set it must be set to                                                                          |
-| `LISTEN_ADDR`          | `String`   | ":6632"       | The ip and port pair pixie will listen on.                                                                                                                                         |
+
 
 ### Example
 

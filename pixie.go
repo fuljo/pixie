@@ -30,6 +30,8 @@ var (
 	webhookTimeout = envDurationFb("WEBHOOK_TIMEOUT", time.Millisecond*250)
 	mergeWebhook   = envBool("WEBHOOK_MERGE")
 
+	pdfAnnotationMode = envStringFb("PDF_ANNOTATION_MODE", "banner")
+
 	pdfUnit        = envStringFb("PDF_UNIT_SIZE", "mm")
 	pdfSize        = envStringFb("PDF_PAGE_SIZE", "A4")
 	pdfFontDir     = envString("PDF_FONT_DIR")
