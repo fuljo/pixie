@@ -46,6 +46,9 @@ var (
 	pdfBottomMargin = float64(envIntFb("PDF_BOTTOM_MARGIN", 6))
 	pdfLineHeight   = float64(envIntFb("PDF_LINE_HEIGHT", 8))
 
+	pdfTextWatermarkOptions = envStringFb("PDF_TEXT_WATERMARK_OPTIONS",
+		"fontname: Courier, points: 12, scalefactor: 1 abs, pos: tr, aligntext: r, offset: -30 -15, fillcolor: #000000, backgroundcolor: #ffffff, rotation: 0")
+
 	listen = envStringFb("LISTEN_ADDR", ":6632")
 
 	ansibleRepoDir = envStringFb("REPO_DIR", "/tmp/repo")

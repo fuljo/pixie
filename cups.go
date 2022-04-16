@@ -65,14 +65,15 @@ func cupsHandler(to []byte) func(writer http.ResponseWriter, request *http.Reque
 				}
 
 				inRead := bytes.NewReader(bts[sep:])
-				fp, err := os.OpenFile("./out.pdf", os.O_RDWR|os.O_CREATE, 0755)
 
 				if err != nil {
 					panic(err)
 				}
 
 				if pdfAnnotationMode == "banner" {
-					err = addBannerPage(inRead, fp, request)
+					err = addBannerPage(inRead, rw, request)
+				} else if pdfAnnotationMode == "text-watermark" {
+					err = addTextWatermark(inRead, rw, request)
 				} else {
 					err = fmt.Errorf("unknown annotation mode: %v", pdfAnnotationMode)
 				}
@@ -81,7 +82,6 @@ func cupsHandler(to []byte) func(writer http.ResponseWriter, request *http.Reque
 					panic(err)
 				}
 
-				fp.Close()
 				_ = rw.Close()
 			}()
 		}
@@ -114,6 +114,33 @@ func cupsHandler(to []byte) func(writer http.ResponseWriter, request *http.Reque
 			panic(err)
 		}
 	}
+}
+
+func addTextWatermark(inRead io.ReadSeeker, outWrite io.Writer, request *http.Request) error {
+	keys, values := requestToMap(request)
+
+	// Prepare the text
+	kvs := []string{}
+	for _, k := range keys {
+		if !strings.HasPrefix(k, "img") {
+			kvs = append(kvs, fmt.Sprintf("%v: %v", k, values[k]))
+		}
+	}
+	text := strings.Join(kvs, " - ")
+
+	// Create the watermark
+	onTop := true // true: stamp over text, false: watermark below text
+	update := false
+	watermark, err := pdfcpu.TextWatermark(text, pdfTextWatermarkOptions, onTop, update, 0)
+
+	if err != nil {
+		return err
+	}
+
+	// Add watermark to all pages
+	err = pdfcpu.AddWatermarks(inRead, outWrite, nil, watermark, nil)
+
+	return err
 }
 
 func addBannerPage(inRead io.ReadSeeker, outWrite io.Writer, request *http.Request) error {
