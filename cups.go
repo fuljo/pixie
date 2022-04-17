@@ -8,11 +8,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/mbenkmann/golib/util"
 
 	"github.com/OpenPrinting/goipp"
 	"github.com/jung-kurt/gofpdf"
@@ -31,65 +34,161 @@ type (
 func cupsHandler(to []byte) func(writer http.ResponseWriter, request *http.Request) {
 	return func(writer http.ResponseWriter, request *http.Request) {
 		requestedUrl := fmt.Sprintf("ipp://%s/%s", strings.TrimRight(request.Host, "/"), strings.Trim(request.URL.Path, "/"))
-		from := btsReplace([]byte(requestedUrl))
+		log.Printf("-----------------------------------------------------------\n")
+		log.Printf("Request: %s\n", requestedUrl)
 
-		bts, err := io.ReadAll(request.Body)
+		respBts, err := io.ReadAll(request.Body)
+		if err != nil {
+			panic(err)
+		}
+
+		// Read the message
+		reader := bytes.NewBuffer(respBts)
+		var req goipp.Message
+		if err := req.Decode(reader); err != nil {
+			panic(err)
+		}
+		reqBody, err := io.ReadAll(reader)
 		if err != nil {
 			panic(err)
 		}
 
 		// Replace the url
-		bts = bytes.Replace(bts, from, to, -1)
-
-		// Read the message
-		var req goipp.Message
-		if err := req.DecodeBytes(bts); err != nil {
+		for _, op := range req.Operation {
+			if op.Name == "printer-uri" {
+				op.Values[0].V = goipp.String("ipp://" + printerTo)
+			}
+		}
+		ippReq, err := req.EncodeBytes()
+		if err != nil {
 			panic(err)
 		}
+		newReqBts := append(ippReq, reqBody...)
+
+		// log.Printf("Post length: %d\n", len(bts))
+		// log.Printf("Request:\n")
+		// req.Print(os.Stdout, true)
+
+		var newReq io.Reader
+		newReq = bytes.NewBuffer(newReqBts)
 
 		// In normal cases, simply proxy the request, only when a document is sent some magic is needed.
-		var b io.Reader = bytes.NewBuffer(bts)
+		log.Printf("Opcode: %v\n", goipp.Op(req.Code))
 		if goipp.Op(req.Code) == goipp.OpSendDocument {
-			// Search for the PDF header
-			sep := bytes.Index(bts, []byte("%PDF"))
-			if sep < 0 {
-				panic("Not found!")
+			var rw *io.PipeWriter
+			newReq, rw = io.Pipe()
+
+			file, err := os.Create("/tmp/original-body.bin")
+			if err != nil {
+				panic(err)
+			}
+			_, err = util.WriteAll(file, reqBody)
+			if err != nil {
+				panic(err)
 			}
 
-			var rw *io.PipeWriter
-			b, rw = io.Pipe()
+			// Search for the PDF header.
+			pdfStart := bytes.Index(reqBody, []byte("%PDF"))
+			if pdfStart < 0 {
+				panic("PDF not found!")
+			}
+			pjlFooterStart := bytes.LastIndex(bytes.TrimRight(reqBody, "\x1b%-12345X"), []byte("\x1b%-12345X"))
+			if pjlFooterStart < 0 {
+				pjlFooterStart = len(reqBody)
+			}
+
+			pjlHeader := reqBody[:pdfStart]
+			pdfBody := reqBody[pdfStart:pjlFooterStart]
+			pjlFooter := reqBody[pjlFooterStart:]
+
+			file, err = os.Create("/tmp/pjl-header.bin")
+			if err != nil {
+				panic(err)
+			}
+			_, err = util.WriteAll(file, pjlHeader)
+			if err != nil {
+				panic(err)
+			}
+
+			file, err = os.Create("/tmp/original-pdf.bin")
+			if err != nil {
+				panic(err)
+			}
+			_, err = util.WriteAll(file, pdfBody)
+			if err != nil {
+				panic(err)
+			}
+
+			file, err = os.Create("/tmp/pjl-footer.bin")
+			if err != nil {
+				panic(err)
+			}
+			_, err = util.WriteAll(file, pjlFooter)
+			if err != nil {
+				panic(err)
+			}
 
 			go func() {
-				if _, err := rw.Write(bts[:sep]); err != nil {
+				// Write the IPP message.
+				if _, err := util.WriteAll(rw, ippReq); err != nil {
 					panic(err)
 				}
 
-				inRead := bytes.NewReader(bts[sep:])
-
-				if err != nil {
+				// Write the first PJL commands.
+				if _, err := util.WriteAll(rw, pjlHeader); err != nil {
 					panic(err)
 				}
 
+				// _, err := util.WriteAll(rw, pdfBody)
+				// if err != nil {
+				// 	panic(err)
+				// }
+
+				// file, err := os.Open("/tmp/test.pdf")
+				// b, err := io.ReadAll(file)
+				// util.WriteAll(rw, b)
+
+				inRead := bytes.NewReader(pdfBody)
+				buffer := new(bytes.Buffer)
 				if pdfAnnotationMode == "banner" {
-					err = addBannerPage(inRead, rw, request)
+					err = addBannerPage(inRead, buffer, request)
 				} else if pdfAnnotationMode == "text-watermark" {
-					err = addTextWatermark(inRead, rw, request)
+					err = addTextWatermark(inRead, buffer, request)
 				} else {
 					err = fmt.Errorf("unknown annotation mode: %v", pdfAnnotationMode)
 				}
-
 				if err != nil {
 					panic(err)
 				}
+				// Write the real PDF.
+				if _, err := util.WriteAll(rw, buffer.Bytes()); err != nil {
+					panic(err)
+				}
+
+				file, err = os.Create("/tmp/new-pdf.pdf")
+				if err != nil {
+					panic(err)
+				}
+				if _, err := util.WriteAll(file, buffer.Bytes()); err != nil {
+					panic(err)
+				}
+
+				// Write the PJL footer.
+				// if _, err := util.WriteAll(rw, pjlFooter); err != nil {
+				// 	panic(err)
+				// }
 
 				_ = rw.Close()
 			}()
 		}
 
-		hreq, err := http.NewRequest(request.Method, "http://"+printerTo, b)
+		hreq, err := http.NewRequest(request.Method, "http://"+printerTo, newReq)
+		if err != nil {
+			panic(err)
+		}
 		for k, values := range request.Header {
 			for _, value := range values {
-				hreq.Header.Add(k, strings.Replace(value, requestedUrl, printerTo, -1))
+				hreq.Header.Add(k, strings.Replace(value, requestedUrl, "ipp://"+printerTo, -1))
 			}
 		}
 
@@ -99,18 +198,42 @@ func cupsHandler(to []byte) func(writer http.ResponseWriter, request *http.Reque
 			panic(err)
 		}
 
-		bts, err = io.ReadAll(resp.Body)
+		respBts, err = io.ReadAll(resp.Body)
+		if err != nil {
+			panic(err)
+		}
 		_ = resp.Body.Close()
-		bts = bytes.Replace(bts, to, from, -1)
+
+		var res goipp.Message
+		err = res.DecodeBytes(respBts)
+
+		respHeader, err := res.EncodeBytes()
+		respHeaderBytes := len(respHeader)
+		respBody := respBts[respHeaderBytes:]
+
+		for _, op := range res.Operation {
+			if op.Name == "printer-uri" {
+				op.Values[0].V = goipp.String(requestedUrl)
+			}
+		}
+
+		// log.Printf("Previous response length: %d\n", len(respBts))
+		// log.Printf("Previous header len: %d\n", respHeaderBytes)
+		// log.Printf("Previous body len: %d\n", len(respBody))
+		respBts, err = res.EncodeBytes()
+		respBts = append(respBts, respBody...)
+		// log.Printf("New response length: %d\n", len(respBts))
+		// log.Printf("Response:\n")
+		// res.Print(os.Stdout, false)
 
 		writer.WriteHeader(resp.StatusCode)
 		for k, values := range resp.Header {
 			for _, value := range values {
-				writer.Header().Add(k, strings.Replace(value, printerTo, requestedUrl, -1))
+				writer.Header().Add(k, strings.Replace(value, "ipp://"+printerTo, requestedUrl, -1))
 			}
 		}
 
-		if _, err := writer.Write(bts); err != nil {
+		if _, err := writer.Write(respBts); err != nil {
 			panic(err)
 		}
 	}
@@ -138,6 +261,8 @@ func addTextWatermark(inRead io.ReadSeeker, outWrite io.Writer, request *http.Re
 	}
 
 	// Add watermark to all pages
+	// page, err := pdfcpu.PageCount(inRead, nil)
+	// log.Printf("Pages: %v %v", page, err)
 	err = pdfcpu.AddWatermarks(inRead, outWrite, nil, watermark, nil)
 
 	return err

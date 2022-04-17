@@ -6,6 +6,7 @@ require (
 	github.com/AaronO/go-git-http v0.0.0-20161214145340-1d9485b3a98f
 	github.com/OpenPrinting/goipp v1.0.0
 	github.com/jung-kurt/gofpdf v1.16.2
+	github.com/mbenkmann/golib v0.0.0-20180611202533-782cc2630c6f
 	github.com/pdfcpu/pdfcpu v0.3.12
 	github.com/spf13/afero v1.6.0
 )
@@ -19,6 +20,7 @@ require (
 	golang.org/x/text v0.3.7 // indirect
 	gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
+	winterdrache.de/golib v0.0.0-20180611202533-782cc2630c6f // indirect
 )
 
 replace github.com/AaronO/go-git-http => github.com/weaming/go-git-http v0.0.0-20180722082741-cd0469f04f1e

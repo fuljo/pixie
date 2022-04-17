@@ -16,6 +16,8 @@ github.com/kr/pretty v0.2.0/go.mod h1:ipq/a2n7PKx3OHsz4KJII5eveXtPO4qwEXGdVfWzfn
 github.com/kr/pty v1.1.1/go.mod h1:pFQYn66WHrOpPYNljwOMqo10TkYh1fy3cYio2l3bCsQ=
 github.com/kr/text v0.1.0 h1:45sCR5RtlFHMR4UwH9sdQ5TC8v0qDQCHnXt+kaKSTVE=
 github.com/kr/text v0.1.0/go.mod h1:4Jbv+DJW3UT/LiOwJeYQe1efqtUx/iVham/4vfdArNI=
+github.com/mbenkmann/golib v0.0.0-20180611202533-782cc2630c6f h1:tcG0PT2h9xu8Ej0vrjNqgeu9wermcwIRp63NMZ12oro=
+github.com/mbenkmann/golib v0.0.0-20180611202533-782cc2630c6f/go.mod h1:DXEDngoYrP+yJpEOQRLPNgiyn6QMoScAKSRi3ewobU0=
 github.com/pdfcpu/pdfcpu v0.3.12 h1:B+MdKisilWNSk5OCO58Z9U6H93usH73xqk6hMOaZCls=
 github.com/pdfcpu/pdfcpu v0.3.12/go.mod h1:8XVBtVxuuIuSZL4Ez15Q4QoC+H8zeAaGnuiOEwAk8jA=
 github.com/phpdave11/gofpdi v1.0.7/go.mod h1:vBmVV0Do6hSBHC8uKUQ71JGW+ZGQq74llk/7bXwjDoI=
@@ -54,3 +56,5 @@ gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15/go.mod h1:Co6ibVJAznAaIkqp8
 gopkg.in/yaml.v2 v2.2.2/go.mod h1:hI93XBmqTisBFMUTm0b8Fm+jr3Dg1NNxqwp+5A1VGuI=
 gopkg.in/yaml.v2 v2.4.0 h1:D8xgwECY7CYvx+Y2n4sBz93Jn9JRvxdiyyo8CTfuKaY=
 gopkg.in/yaml.v2 v2.4.0/go.mod h1:RDklbk79AGWmwhnvt/jBztapEOGDOx6ZbXqjP6csGnQ=
+winterdrache.de/golib v0.0.0-20180611202533-782cc2630c6f h1:2EwLocAjr996KiP/EkFhd1Au0ejDZFCVf1KLJe6s+3E=
+winterdrache.de/golib v0.0.0-20180611202533-782cc2630c6f/go.mod h1:EEaUF0svVcYFqVVZuUzu7m/+2AdtRtqlXqyzqlkbaw4=
